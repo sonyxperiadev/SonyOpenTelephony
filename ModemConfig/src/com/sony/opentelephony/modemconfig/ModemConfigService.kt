@@ -55,7 +55,11 @@ class ModemConfigService : Service() {
         fun specificity() = listOfNotNull(mcc, mnc, gid1, imsi, sp).count()
     }
 
-    private lateinit var providers: List<ProviderFilter>
+    private val providers: List<ProviderFilter> by lazy {
+        // WARNING: This lazy assumes `providers` is used after the service has started,
+        // parseProviders requires a valid Context to call `getResources()` on.
+        parseProviders()
+    }
 
     private val notificationManager: NotificationManager by lazy {
         getSystemService(NotificationManager::class.java)
@@ -217,9 +221,6 @@ class ModemConfigService : Service() {
 
     override fun onCreate() {
         Log.e(TAG, "Starting")
-
-        providers = parseProviders()
-
         val sm = getSystemService(SubscriptionManager::class.java)
                  ?: throw Exception("Expected SubscriptionManager, got null")
 
