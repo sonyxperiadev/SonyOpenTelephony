@@ -56,8 +56,7 @@ class ModemConfigService : Service() {
         fun specificity() = listOfNotNull(mcc, mnc, gid1, imsi, sp).count()
     }
 
-    // TODO: Do a lateinit here?
-    private /*lateinit*/ var providers: List<ProviderFilter>? = null
+    private var providers: List<ProviderFilter> = emptyList()
 
     private val notificationManager: NotificationManager by lazy {
         getSystemService(NotificationManager::class.java)
@@ -65,8 +64,7 @@ class ModemConfigService : Service() {
     }
 
     private fun getProviders(context: Context): List<ProviderFilter> {
-        if (providers != null)
-            return providers!!
+        if (providers.isNotEmpty()) return providers
 
         val list = arrayListOf<ProviderFilter>()
 
