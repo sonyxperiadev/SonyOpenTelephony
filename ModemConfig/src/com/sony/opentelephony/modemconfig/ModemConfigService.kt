@@ -20,7 +20,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.telephony.SubscriptionInfo
@@ -56,24 +55,20 @@ class ModemConfigService : Service() {
         fun specificity() = listOfNotNull(mcc, mnc, gid1, imsi, sp).count()
     }
 
-    // TODO: Do a lateinit here?
-    private /*lateinit*/ var providers: List<ProviderFilter>? = null
+    private lateinit var providers: List<ProviderFilter>
 
     private val notificationManager: NotificationManager by lazy {
         getSystemService(NotificationManager::class.java)
         ?: throw Exception("Expected NotificationManager, got null")
     }
 
-    private fun getProviders(context: Context): List<ProviderFilter> {
-        if (providers != null)
-            return providers!!
-
+    private fun parseProviders(): List<ProviderFilter> {
         val list = arrayListOf<ProviderFilter>()
 
         val currentMap = hashMapOf<String, String>()
         var simConfigId: String? = null
 
-        context.resources.getXml(R.xml.service_provider_sim_configs).use { xml ->
+        this.resources.getXml(R.xml.service_provider_sim_configs).use { xml ->
             while (xml.next() != XmlPullParser.END_DOCUMENT) {
                 if (xml.eventType == XmlPullParser.END_TAG &&
                     xml.name == "service_provider_sim_config") {
@@ -111,13 +106,12 @@ class ModemConfigService : Service() {
         }
 
         list.sortByDescending { it.specificity() }
-        providers = list
         return list
     }
 
     private fun String.cleanString() = replace(newlineMatch, "").trim()
 
-    private fun findConfigurationName(context: Context, tm: TelephonyManager): String? {
+    private fun findConfigurationName(tm: TelephonyManager): String? {
         val operator = tm.simOperator
         if (operator.isNullOrEmpty()) {
             Log.d(TAG, "Operator is null or empty")
@@ -137,7 +131,7 @@ class ModemConfigService : Service() {
         if (VERBOSE) Log.v(TAG, "Matching providers against: $sp $mcc/$mnc, imsi: $imsi" +
                                 ", gid: $gid1")
 
-        val result = getProviders(context).firstOrNull f@{ info ->
+        val result = providers.firstOrNull f@{ info ->
             if (info.mcc != null && info.mcc != mcc)
                 return@f false
             if (info.mnc != null && info.mnc != mnc)
@@ -184,7 +178,7 @@ class ModemConfigService : Service() {
 
         val globalTm = getSystemService(TelephonyManager::class.java)
         val tm = globalTm!!.createForSubscriptionId(sub.subscriptionId)
-        val name = findConfigurationName(this, tm)
+        val name = findConfigurationName(tm)
 
         val notificationText = if (name != null) {
             val prop = "persist.somc.cust.modem${sub.simSlotIndex}"
@@ -223,6 +217,9 @@ class ModemConfigService : Service() {
 
     override fun onCreate() {
         Log.e(TAG, "Starting")
+
+        providers = parseProviders()
+
         val sm = getSystemService(SubscriptionManager::class.java)
                  ?: throw Exception("Expected SubscriptionManager, got null")
 
